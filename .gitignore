@@ -1,0 +1,2 @@
+# Ignorar la carpeta de compilación (archivos temporales y el .exe)
+build/
