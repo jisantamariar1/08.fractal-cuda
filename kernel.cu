@@ -2,6 +2,34 @@ const int PALETTE_SIZE = 16;
 __constant__
 unsigned int color_ramp[PALETTE_SIZE];
 
+__device__
+uint32_t acotado(double x, double y, double cr, double ci, int max_iteraciones) {
+    int iter = 1;
+    double zr = x; // Parte real de z.
+    double zi = y; // Parte imaginaria de z.
+
+    // OPTIMIZACIÓN: (zr*zr + zi*zi) < 4.0 es equivalente a abs(z) < 2.0.
+    // Se usa 4.0 porque así evitamos calcular la raíz cuadrada interna de abs().
+    while (iter < max_iteraciones && (zr * zr + zi * zi) < 4.0) {
+        
+        // Aplicamos binomio al cuadrado: (a + bi)^2 = (a^2 - b^2) + (2ab)i.
+        double dr = zr * zr - zi * zi + cr; // Nueva parte real.
+        double di = 2.0 * zr * zi + ci;     // Nueva parte imaginaria.
+        
+        zr = dr; // Actualizamos para la siguiente iteración.
+        zi = di;
+        iter++;
+    }
+
+    if(iter < max_iteraciones){
+        int index = iter % PALETTE_SIZE; // Usamos el contador de iteraciones para elegir un color de la paleta.
+        return color_ramp[index]; // Devolvemos el color correspondiente de la paleta.
+        //return 0xFF0000FF; // Rojo si escapa.
+    }
+    return 0xFF000000; // Negro si no escapa.
+}
+
+
 __global__
 void julia_kernel(
     double centro_real, double centro_imag,
@@ -10,26 +38,28 @@ void julia_kernel(
     uint32_t width,
      uint32_t height, 
      uint32_t* pixel_buffer) {
-        int idx = blockIdx.x * blockDim.x + threadIdx.x;
-        if (idx >= width * height) return;
 
-        int x = idx % width;
-        int y = idx / width;
+        double dx = (x_max - x_min) / width;
+        double dy = (y_max - y_min) / height;
 
-        double real = x_min + (x_max - x_min) * x / width;
-        double imag = y_min + (y_max - y_min) * y / height;
+        int index = blockIdx.x * blockDim.x + threadIdx.x;
 
-        int max_iter = num_iteraciones;
-        int iter = 0;
-        while (real * real + imag * imag < 4.0 && iter < max_iter) {
-            double temp_real = real * real - imag * imag + centro_real;
-            imag = 2.0 * real * imag + centro_imag;
-            real = temp_real;
-            iter++;
+
+        if (index<width * height){
+            int i = index / width;
+            int j = index % width;
+
+            double x = x_min + i * dx;
+            double y = y_min + j * dy;
+
+            auto color = acotado(
+                x,y, centro_real, centro_imag, num_iteraciones); // Default color if max iterations reached
+            
+            pixel_buffer[j*width + i] = color;
         }
 
-        pixel_buffer[idx] = iter == max_iter ? 0 : iter; // Store the iteration count
     }
+
 
     void copiar_paleta(unsigned int* h_palette) {
         //copiar la paleta desde la cpu a la gpu
