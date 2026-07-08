@@ -31,7 +31,10 @@ void julia_kernel(
         pixel_buffer[idx] = iter == max_iter ? 0 : iter; // Store the iteration count
     }
 
-
+    void copiar_paleta(unsigned int* h_palette) {
+        //copiar la paleta desde la cpu a la gpu
+        cudaMemcpyToSymbol(color_ramp, h_palette, PALETTE_SIZE * sizeof(unsigned int));
+    }
 
 
 void julia_gpu(
