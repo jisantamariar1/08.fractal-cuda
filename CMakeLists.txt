@@ -13,7 +13,7 @@ find_package(SFML COMPONENTS Graphics Window System REQUIRED)
 
 add_executable(fractal-cuda
     main.cpp
-    pallette.cpp
+    palette.cpp
     kernel.cu
 )
 
